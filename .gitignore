@@ -1,0 +1,25 @@
+# Node
+node_modules/
+npm-debug.log
+
+# Python
+__pycache__/
+*.pyc
+
+# Editor
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker related
+docker-data/
+*.pid
+*.log
+
+# Build output
+dist/
+build/
+coverage/

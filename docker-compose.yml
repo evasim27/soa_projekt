@@ -1,0 +1,78 @@
+version: "3.9"
+
+services:
+  user-db:
+    image: postgres:15
+    container_name: user-db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: usersdb
+    volumes:
+      - user_data:/var/lib/postgresql/data
+      - ./user-service/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5433:5432"
+    networks:
+      - ToGoodToGoService
+
+  user-service:
+    build: 
+      context: ./user-service  
+      dockerfile: Dockerfile
+    container_name: user-service
+    restart: always
+    ports:
+      - "5001:5001"
+    depends_on:
+      - user-db
+    environment:
+      DB_HOST: user-db
+      DB_USER: postgres
+      DB_PASS: postgres
+      DB_NAME: usersdb
+      PORT: 5001
+    networks:
+      - ToGoodToGoService
+
+  merchant-db:
+    image: postgres:15
+    container_name: merchant-db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: merchantdb
+    volumes:
+      - merchant_data:/var/lib/postgresql/data
+      - ./merchant-service/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5434:5432"
+    networks:
+      - ToGoodToGoService
+
+  merchant-service:
+    build: ./merchant-service
+    container_name: merchant-service
+    restart: always
+    ports:
+      - "5002:5002"
+    environment:
+      DB_HOST: merchant-db
+      DB_USER: postgres
+      DB_PASS: postgres
+      DB_NAME: merchantdb
+      USER_SERVICE_URL: http://user-service:5001
+    depends_on:
+      - merchant-db
+    networks:
+      - ToGoodToGoService
+
+volumes:
+  user_data:
+  merchant_data:
+
+networks:
+  ToGoodToGoService:
+    driver: bridge
