@@ -1,6 +1,7 @@
 # Node
 node_modules/
 order-service/node_modules/
+offer-service/node_modules/
 npm-debug.log
 
 # Logs
