@@ -106,9 +106,20 @@ async function getPaymentsByUserId(userId, limit = 50, offset = 0) {
   return await PaymentModel.getByUserId(userId, limit, offset);
 }
 
+async function updatePaymentStatus(paymentId, status, metadata = {}) {
+  const updates = { status };
+
+  if (Object.keys(metadata).length > 0) {
+    updates.metadata = metadata;
+  }
+
+  return await PaymentModel.update(paymentId, updates);
+}
+
 module.exports = {
   validatePayment,
   getPaymentById,
   getPaymentsByOrderId,
-  getPaymentsByUserId
+  getPaymentsByUserId,
+  updatePaymentStatus
 };

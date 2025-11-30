@@ -1,5 +1,19 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Depends
+from pydantic import BaseModel
+from typing import Optional
 from src.models.notification import NotificationCreate
+
+class BulkDeleteParams(BaseModel):
+    user_id: int
+    before_date: Optional[str] = None
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "user_id": 1,
+                "before_date": "2024-01-01T00:00:00Z"
+            }
+        }
 from src.controllers.notification_controller import (
     create_notification_controller,
     get_notifications_controller,
@@ -7,7 +21,10 @@ from src.controllers.notification_controller import (
     mark_read_controller,
     mark_all_read_controller,
     get_unread_count_controller,
-    delete_notification_controller
+    delete_notification_controller,
+    get_notification_stats_controller,
+    bulk_delete_notifications_controller,
+    delete_read_notifications_controller
 )
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
@@ -59,3 +76,15 @@ def mark_all_read(
 @router.delete("/{notification_id}")
 def delete_notification(notification_id: int):
     return delete_notification_controller(notification_id)
+
+@router.get("/stats")
+def get_notification_stats(user_id: int = Query(..., description="User ID")):
+    return get_notification_stats_controller(user_id)
+
+@router.delete("/bulk")
+def bulk_delete_notifications(params: BulkDeleteParams = Depends()):
+    return bulk_delete_notifications_controller(params.user_id, params.before_date)
+
+@router.delete("/read/{user_id}")
+def delete_read_notifications(user_id: int):
+    return delete_read_notifications_controller(user_id)

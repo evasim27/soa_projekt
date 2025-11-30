@@ -7,7 +7,10 @@ from src.services.notification_service import (
     mark_notification_as_read,
     mark_all_as_read,
     get_unread_count,
-    delete_notification
+    delete_notification,
+    get_notification_stats,
+    bulk_delete_notifications,
+    delete_read_notifications
 )
 from src.utils.user_client import get_user
 
@@ -56,3 +59,24 @@ def delete_notification_controller(notification_id: int):
     if not success:
         raise HTTPException(status_code=404, detail="Notification not found")
     return {"message": "Notification deleted successfully"}
+
+def get_notification_stats_controller(user_id: int):
+    try:
+        stats = get_notification_stats(user_id)
+        return stats
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+def bulk_delete_notifications_controller(user_id: int, before_date: str = None):
+    try:
+        count = bulk_delete_notifications(user_id, before_date)
+        return {"message": f"Deleted {count} notifications successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+def delete_read_notifications_controller(user_id: int):
+    try:
+        count = delete_read_notifications(user_id)
+        return {"message": f"Deleted {count} read notifications successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

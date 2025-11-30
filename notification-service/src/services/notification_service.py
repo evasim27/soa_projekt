@@ -127,3 +127,69 @@ def delete_notification(notification_id: int) -> bool:
         raise e
     finally:
         conn.close()
+
+def get_notification_stats(user_id: int) -> dict:
+    """Get notification statistics for a user"""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) as total FROM notifications WHERE user_id = %s", (user_id,))
+        total = cursor.fetchone()['total']
+
+        cursor.execute("SELECT COUNT(*) as unread FROM notifications WHERE user_id = %s AND status != 'read'", (user_id,))
+        unread = cursor.fetchone()['unread']
+
+        cursor.execute("""
+            SELECT type, COUNT(*) as count
+            FROM notifications
+            WHERE user_id = %s
+            GROUP BY type
+        """, (user_id,))
+        type_counts = dict(cursor.fetchall())
+
+        return {
+            "total_notifications": total,
+            "unread_notifications": unread,
+            "notifications_by_type": type_counts
+        }
+    finally:
+        conn.close()
+
+def bulk_delete_notifications(user_id: int, before_date: str = None) -> int:
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+
+        if before_date:
+            cursor.execute(
+                "DELETE FROM notifications WHERE user_id = %s AND created_at < %s",
+                (user_id, before_date)
+            )
+        else:
+            cursor.execute("DELETE FROM notifications WHERE user_id = %s", (user_id,))
+
+        deleted_count = cursor.rowcount
+        conn.commit()
+        return deleted_count
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+def delete_read_notifications(user_id: int) -> int:
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM notifications WHERE user_id = %s AND status = 'read'",
+            (user_id,)
+        )
+        deleted_count = cursor.rowcount
+        conn.commit()
+        return deleted_count
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()

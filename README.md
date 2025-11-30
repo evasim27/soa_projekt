@@ -25,6 +25,7 @@ Tehnologije
 Python (FastAPI)
 PostgreSQL
 Port: 5002
+Dokumentacija: http://localhost:5002/docs
 
 ENDPOINTI
 | Metoda   | Pot                                                                    | Opis                                                                           |
@@ -52,15 +53,21 @@ ENDPOINTI
 | Metoda     | Pot                        | Opis                                      |
 | ---------- | ---------------------------| ----------------------------------------- |
 | **POST**   | `/payments/validate`       | Preveri podatke kartice (številka, datum, CVV) |
+| **POST**   | `/payments/refund`         | Procesira povračilo plačila               |
 | **GET**    | `/payments/{id}`           | Vrne plačilo po ID                        |
 | **GET**    | `/payments/order/{orderId}`| Vrne plačila za naročilo                  |
 | **GET**    | `/payments/user/{userId}`  | Vrne plačila uporabnika                   |
+| **PUT**    | `/payments/{id}/status`    | Posodobi status plačila                   |
+| **PUT**    | `/payments/{id}/capture`   | Capture avtoriziranega plačila            |
+| **DELETE** | `/payments/{id}`           | Izbriše plačilo                           |
+| **DELETE** | `/payments/{id}/cancel`    | Prekliče plačilo                          |
 
 **4) notification-service**
 Tehnologije
 Python (FastAPI)
 PostgreSQL
 Port: 5004
+Dokumentacija: http://localhost:5004/docs
 
 ENDPOINTI
 | Metoda     | Pot                               | Opis                                               |
@@ -72,9 +79,12 @@ ENDPOINTI
 | **GET**    | `/notifications`                 | Vrne uporabnikova obvestila (z paginacijo)         |
 | **GET**    | `/notifications/unread`          | Vrne število neprebranih obvestil                  |
 | **GET**    | `/notifications/{id}`             | Vrne specifično obvestilo                          |
+| **GET**    | `/notifications/stats`            | Vrne statistiko obvestil za uporabnika             |
 | **PUT**    | `/notifications/{id}/read`       | Označi obvestilo kot prebrano                      |
 | **PUT**    | `/notifications/read-all`        | Označi vsa obvestila kot prebrana                  |
 | **DELETE** | `/notifications/{id}`             | Izbriše obvestilo                                  |
+| **DELETE** | `/notifications/bulk`             | Množično izbriše obvestila za uporabnika           |
+| **DELETE** | `/notifications/read`             | Izbriše vsa prebrana obvestila za uporabnika       |
 | **GET**    | `/notifications/preferences`     | Vrne nastavitve obvestil uporabnika                |
 | **POST**   | `/notifications/preferences`     | Ustvari nastavitve obvestil uporabnika             |
 | **PUT**    | `/notifications/preferences`     | Posodobi nastavitve obvestil uporabnika            |
