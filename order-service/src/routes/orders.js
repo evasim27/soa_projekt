@@ -291,7 +291,6 @@ module.exports = async function (fastify, opts) {
             summary: 'Serve QR image file',
             params: { type: 'object', properties: { file: { type: 'string' } }, required: ['file'] },
             response: {
-                // Use a simple string schema for the 200 response (we stream file, so body is binary/string)
                 200: { type: 'string' },
                 404: { type: 'object', properties: { error: { type: 'string' } } }
             }
