@@ -7,7 +7,40 @@ module.exports = async function (fastify, opts) {
     const qrDir = opts.qrDir || path.join(__dirname, '..', '..', 'qrcodes');
 
     // GET 1: list orders
-    fastify.get('/', async (request, reply) => {
+    fastify.get('/', {
+        schema: {
+            summary: 'List orders',
+            description: 'Return list of orders, optionally filtered by status',
+            querystring: {
+                type: 'object',
+                properties: {
+                    limit: { type: 'integer', default: 50 },
+                    offset: { type: 'integer', default: 0 },
+                    status: { type: 'string' }
+                }
+            },
+            response: {
+                200: {
+                    type: 'array',
+                    items: {
+                        type: 'object',
+                        properties: {
+                            id: { type: 'integer' },
+                            offer_id: { type: ['integer', 'null'] },
+                            name: { type: 'string' },
+                            email: { type: ['string', 'null'] },
+                            phone: { type: ['string', 'null'] },
+                            quantity: { type: 'integer' },
+                            status: { type: 'string' },
+                            qr_image: { type: ['string', 'null'] },
+                            created_at: { type: 'string' },
+                            updated_at: { type: 'string' }
+                        }
+                    }
+                }
+            }
+        }
+    }, async (request, reply) => {
         const { limit = 50, offset = 0, status } = request.query;
         const params = [];
         let sql = 'SELECT * FROM orders';
@@ -22,14 +55,80 @@ module.exports = async function (fastify, opts) {
     });
 
     // GET 2: get order
-    fastify.get('/:id', async (request, reply) => {
+    fastify.get('/:id', {
+        schema: {
+            summary: 'Get an order by id',
+            params: {
+                type: 'object',
+                properties: { id: { type: 'integer' } },
+                required: ['id']
+            },
+            response: {
+                200: {
+                    type: 'object',
+                    properties: {
+                        id: { type: 'integer' },
+                        offer_id: { type: ['integer', 'null'] },
+                        name: { type: 'string' },
+                        email: { type: ['string', 'null'] },
+                        phone: { type: ['string', 'null'] },
+                        quantity: { type: 'integer' },
+                        status: { type: 'string' },
+                        qr_image: { type: ['string', 'null'] },
+                        created_at: { type: 'string' },
+                        updated_at: { type: 'string' }
+                    }
+                },
+                404: { type: 'object', properties: { error: { type: 'string' } } }
+            }
+        }
+    }, async (request, reply) => {
         const { rows } = await pool.query('SELECT * FROM orders WHERE id=$1', [request.params.id]);
         if (!rows[0]) return reply.status(404).send({ error: 'not found' });
         return rows[0];
     });
 
     // POST 1: create order + generate QR
-    fastify.post('/', async (request, reply) => {
+    fastify.post('/', {
+        schema: {
+            summary: 'Create order and generate QR',
+            body: {
+                type: 'object',
+                required: ['name'],
+                properties: {
+                    offer_id: { type: ['integer', 'null'] },
+                    name: { type: 'string' },
+                    email: { type: ['string', 'null'] },
+                    phone: { type: ['string', 'null'] },
+                    quantity: { type: 'integer', default: 1 }
+                }
+            },
+            response: {
+                201: {
+                    type: 'object',
+                    properties: {
+                        order: {
+                            type: 'object',
+                            properties: {
+                                id: { type: 'integer' },
+                                offer_id: { type: ['integer', 'null'] },
+                                name: { type: 'string' },
+                                email: { type: ['string', 'null'] },
+                                phone: { type: ['string', 'null'] },
+                                quantity: { type: 'integer' },
+                                status: { type: 'string' },
+                                qr_image: { type: ['string', 'null'] },
+                                created_at: { type: 'string' },
+                                updated_at: { type: 'string' }
+                            }
+                        },
+                        qrUrl: { type: 'string' }
+                    }
+                },
+                400: { type: 'object', properties: { error: { type: 'string' } } }
+            }
+        }
+    }, async (request, reply) => {
         try {
             const { offer_id, name, email, phone, quantity = 1 } = request.body;
             if (!name) return reply.status(400).send({ error: 'name required' });
@@ -51,7 +150,20 @@ module.exports = async function (fastify, opts) {
     });
 
     // POST 2: confirm reservation
-    fastify.post('/:id/confirm', async (request, reply) => {
+    fastify.post('/:id/confirm', {
+        schema: {
+            summary: 'Confirm reservation',
+            params: {
+                type: 'object',
+                properties: { id: { type: 'integer' } },
+                required: ['id']
+            },
+            response: {
+                200: { type: 'object' },
+                404: { type: 'object', properties: { error: { type: 'string' } } }
+            }
+        }
+    }, async (request, reply) => {
         const { rows } = await pool.query('SELECT * FROM orders WHERE id=$1', [request.params.id]);
         if (!rows[0]) return reply.status(404).send({ error: 'not found' });
         await pool.query('UPDATE orders SET status=$1, updated_at=now() WHERE id=$2', ['reserved', request.params.id]);
@@ -60,7 +172,31 @@ module.exports = async function (fastify, opts) {
     });
 
     // PUT 1: update order
-    fastify.put('/:id', async (request, reply) => {
+    fastify.put('/:id', {
+        schema: {
+            summary: 'Update order fields',
+            params: {
+                type: 'object',
+                properties: { id: { type: 'integer' } },
+                required: ['id']
+            },
+            body: {
+                type: 'object',
+                properties: {
+                    offer_id: { type: ['integer', 'null'] },
+                    name: { type: 'string' },
+                    email: { type: ['string', 'null'] },
+                    phone: { type: ['string', 'null'] },
+                    quantity: { type: 'integer' }
+                }
+            },
+            response: {
+                200: { type: 'object' },
+                400: { type: 'object', properties: { error: { type: 'string' } } },
+                404: { type: 'object', properties: { error: { type: 'string' } } }
+            }
+        }
+    }, async (request, reply) => {
         try {
             const fields = ['offer_id', 'name', 'email', 'phone', 'quantity'];
             const updates = [];
@@ -84,7 +220,22 @@ module.exports = async function (fastify, opts) {
     });
 
     // PUT 2: change status only
-    fastify.put('/:id/status', async (request, reply) => {
+    fastify.put('/:id/status', {
+        schema: {
+            summary: 'Change order status',
+            params: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
+            body: {
+                type: 'object',
+                properties: { status: { type: 'string', enum: ['pending', 'reserved', 'collected', 'cancelled'] } },
+                required: ['status']
+            },
+            response: {
+                200: { type: 'object' },
+                400: { type: 'object', properties: { error: { type: 'string' } } },
+                404: { type: 'object', properties: { error: { type: 'string' } } }
+            }
+        }
+    }, async (request, reply) => {
         const { status } = request.body;
         if (!['pending', 'reserved', 'collected', 'cancelled'].includes(status)) {
             return reply.status(400).send({ error: 'invalid status' });
@@ -97,7 +248,16 @@ module.exports = async function (fastify, opts) {
     });
 
     // DELETE 1: cancel order
-    fastify.delete('/:id', async (request, reply) => {
+    fastify.delete('/:id', {
+        schema: {
+            summary: 'Delete (cancel) order',
+            params: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
+            response: {
+                200: { type: 'object', properties: { message: { type: 'string' } } },
+                404: { type: 'object', properties: { error: { type: 'string' } } }
+            }
+        }
+    }, async (request, reply) => {
         const { rows } = await pool.query('DELETE FROM orders WHERE id=$1 RETURNING *', [request.params.id]);
         if (!rows[0]) return reply.status(404).send({ error: 'not found' });
         if (rows[0].qr_image) {
@@ -107,7 +267,16 @@ module.exports = async function (fastify, opts) {
     });
 
     // DELETE 2: delete qr only
-    fastify.delete('/:id/qr', async (request, reply) => {
+    fastify.delete('/:id/qr', {
+        schema: {
+            summary: 'Delete QR of order',
+            params: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
+            response: {
+                200: { type: 'object', properties: { message: { type: 'string' } } },
+                404: { type: 'object', properties: { error: { type: 'string' } } }
+            }
+        }
+    }, async (request, reply) => {
         const { rows } = await pool.query('SELECT qr_image FROM orders WHERE id=$1', [request.params.id]);
         if (!rows[0]) return reply.status(404).send({ error: 'not found' });
         if (rows[0].qr_image) {
@@ -117,7 +286,17 @@ module.exports = async function (fastify, opts) {
         return { message: 'qr deleted' };
     });
 
-    fastify.get('/qrcodes/:file', async (request, reply) => {
+    fastify.get('/qrcodes/:file', {
+        schema: {
+            summary: 'Serve QR image file',
+            params: { type: 'object', properties: { file: { type: 'string' } }, required: ['file'] },
+            response: {
+                // Use a simple string schema for the 200 response (we stream file, so body is binary/string)
+                200: { type: 'string' },
+                404: { type: 'object', properties: { error: { type: 'string' } } }
+            }
+        }
+    }, async (request, reply) => {
         const file = request.params.file;
         const p = path.join(qrDir, file);
         if (!fs.existsSync(p)) return reply.status(404).send({ error: 'not found' });

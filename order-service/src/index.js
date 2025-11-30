@@ -22,6 +22,52 @@ if (!fs.existsSync(QR_DIR)) fs.mkdirSync(QR_DIR, { recursive: true });
 
     fastify.register(fastifyCors, { origin: '*' });
 
+    // ---- Swagger / OpenAPI ----
+    fastify.register(require('@fastify/swagger'), {
+        routePrefix: '/documentation',
+        openapi: {
+            info: {
+                title: 'Order Service API',
+                description: 'API for Order/Reservation service (Fastify + Postgres + QR)',
+                version: '1.0.0'
+            }
+        },
+        exposeRoute: true
+    });
+
+    fastify.register(require('@fastify/swagger-ui'), {
+        routePrefix: '/docs',
+        uiConfig: {
+            docExpansion: 'list',
+            deepLinking: false
+        },
+        staticCSP: true
+    });
+
+    // Expose raw spec exactly at /documentation/json and adjust QR path response to image/png
+    fastify.get('/documentation/json', async (request, reply) => {
+        const spec = fastify.swagger();
+
+        // prilagodi QR path response na image/png (če obstaja)
+        const p = spec.paths && (spec.paths['/orders/qrcodes/{file}'] || spec.paths['/orders/qrcodes/:file']);
+        if (p && p.get && p.get.responses && p.get.responses['200']) {
+            p.get.responses['200'] = {
+                description: 'PNG image',
+                content: {
+                    'image/png': { schema: { type: 'string', format: 'binary' } }
+                }
+            };
+        }
+
+        return reply.send(spec);
+    });
+
+    // Optional: redirect /documentation to UI
+    fastify.get('/documentation', async (request, reply) => {
+        return reply.redirect('/docs');
+    });
+    // ----------------------------
+
     fastify.register(ordersRoutes, { prefix: '/orders', qrDir: QR_DIR });
 
     fastify.get('/', async () => ({ service: 'Order Service', status: 'ok' }));

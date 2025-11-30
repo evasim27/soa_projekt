@@ -7,6 +7,8 @@ RUN npm ci --only=production
 
 COPY src ./src
 
+COPY docs ./docs
+
 RUN mkdir -p /usr/src/app/uploads
 
 ENV PORT=5005

@@ -4,6 +4,8 @@ const morgan = require('morgan');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const YAML = require('yamljs');
+const swaggerUi = require('swagger-ui-express');
 const { ensureSchema } = require('./db');
 const offersRouter = require('./routes/offers');
 
@@ -27,7 +29,36 @@ if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
     app.use(express.json());
     app.use('/uploads', express.static(UPLOAD_DIR));
 
+    // Register existing routes
     app.use('/offers', offersRouter);
+
+    // ---- Swagger / OpenAPI ----
+    // Load static OpenAPI YAML (docs/openapi.yaml)
+    const specPath = path.join(__dirname, '..', 'docs', 'openapi.yaml');
+    let spec = {};
+    try {
+        if (fs.existsSync(specPath)) {
+            spec = YAML.load(specPath);
+        } else {
+            console.warn('Swagger spec not found at', specPath);
+        }
+    } catch (err) {
+        console.error('Error loading OpenAPI spec:', err);
+    }
+
+    // Serve Swagger UI at /docs
+    app.use('/docs', swaggerUi.serve, swaggerUi.setup(spec, { explorer: true }));
+
+    // Raw JSON spec endpoint
+    app.get('/documentation/json', (req, res) => {
+        return res.json(spec);
+    });
+
+    // Redirect /documentation -> /docs
+    app.get('/documentation', (req, res) => {
+        return res.redirect('/docs');
+    });
+    // ----------------------------
 
     app.get('/', (req, res) => res.json({ service: 'Offer Service', status: 'ok' }));
 
