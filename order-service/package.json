@@ -1,0 +1,21 @@
+{
+    "name": "order-service",
+    "version": "1.0.0",
+    "description": "Order/Reservation Service - Fastify + Postgres + QR",
+    "main": "src/index.js",
+    "scripts": {
+        "start": "node src/index.js",
+        "dev": "nodemon src/index.js"
+    },
+    "dependencies": {
+        "dotenv": "^16.3.1",
+        "fastify": "^4.22.2",
+        "@fastify/cors": "^9.0.0",
+        "pg": "^8.11.0",
+        "qrcode": "^1.5.1",
+        "pino-pretty": "^9.1.1"
+    },
+    "devDependencies": {
+        "nodemon": "^2.0.22"
+    }
+}
