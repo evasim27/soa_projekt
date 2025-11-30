@@ -135,11 +135,87 @@ services:
     networks:
       - ToGoodToGoService
 
+  offer-db:
+    image: postgres:15
+    container_name: offer-db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: offerdb
+    volumes:
+      - offer_data:/var/lib/postgresql/data
+    ports:
+      - "5437:5432"
+    networks:
+      - ToGoodToGoService
+
+  offer-service:
+    build:
+      context: ./offer-service
+      dockerfile: Dockerfile
+    container_name: offer-service
+    restart: always
+    ports:
+      - "5005:5005"
+    depends_on:
+      - offer-db
+    environment:
+      DB_HOST: offer-db
+      DB_USER: postgres
+      DB_PASS: postgres
+      DB_NAME: offerdb
+      PORT: 5005
+      UPLOAD_DIR: /usr/src/app/uploads
+    volumes:
+      - ./offer-service/uploads:/usr/src/app/uploads
+    networks:
+      - ToGoodToGoService
+
+  order-db:
+    image: postgres:15
+    container_name: order-db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: orderdb
+    volumes:
+      - order_data:/var/lib/postgresql/data
+    ports:
+      - "5438:5432"
+    networks:
+      - ToGoodToGoService
+
+  order-service:
+    build:
+      context: ./order-service
+      dockerfile: Dockerfile
+    container_name: order-service
+    restart: always
+    ports:
+      - "5006:5006"
+    depends_on:
+      - order-db
+    environment:
+      DB_HOST: order-db
+      DB_USER: postgres
+      DB_PASS: postgres
+      DB_NAME: orderdb
+      PORT: 5006
+      QR_OUTPUT_DIR: /usr/src/app/qrcodes
+    volumes:
+      - ./order-service/qrcodes:/usr/src/app/qrcodes
+    networks:
+      - ToGoodToGoService
+
 volumes:
   user_data:
   merchant_data:
   payment_data:
   notification_data:
+  offer_data:
+  order_data:
 
 networks:
   ToGoodToGoService:

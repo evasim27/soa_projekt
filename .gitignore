@@ -1,12 +1,24 @@
 # Node
 node_modules/
+order-service/node_modules/
 npm-debug.log
 
-# Python
-__pycache__/
-*.pyc
+# Logs
+*.log
 
-# Editor
+# Env / secrets
+.env
+.env.* 
+
+# Build / output
+dist/
+build/
+coverage/
+
+# QR images (generated)
+qrcodes/
+
+# Editor / IDE
 .vscode/
 .idea/
 
@@ -17,9 +29,10 @@ Thumbs.db
 # Docker related
 docker-data/
 *.pid
-*.log
 
-# Build output
-dist/
-build/
-coverage/
+# Python
+__pycache__/
+*.pyc
+
+# Misc
+.DS_Store
