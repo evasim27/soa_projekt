@@ -58,6 +58,124 @@ async function validatePaymentController(req, res) {
   }
 }
 
+/**
+ * @swagger
+ * /payments:
+ *   post:
+ *     summary: Create a new payment
+ *     tags: [Payments]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - amount
+ *             properties:
+ *               amount:
+ *                 type: number
+ *               orderId:
+ *                 type: integer
+ *               userId:
+ *                 type: integer
+ *               currency:
+ *                 type: string
+ *               cardNumber:
+ *                 type: string
+ *               expiryMonth:
+ *                 type: integer
+ *               expiryYear:
+ *                 type: integer
+ *               cvv:
+ *                 type: string
+ *               metadata:
+ *                 type: object
+ *     responses:
+ *       201:
+ *         description: Payment created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Payment'
+ *       400:
+ *         description: Validation failed or missing fields
+ *       500:
+ *         description: Internal server error
+ */
+// (JSDoc above) createPaymentController will be defined below
+
+async function createPaymentController(req, res) {
+  try {
+    const {
+      cardNumber,
+      expiryMonth,
+      expiryYear,
+      cvv,
+      amount,
+      orderId,
+      userId,
+      currency,
+      metadata
+    } = req.body;
+
+    if (!amount) {
+      return res.status(400).json({ error: "Amount is required" });
+    }
+
+    if (cardNumber) {
+      if (!expiryMonth || !expiryYear) {
+        return res.status(400).json({ error: "Expiry month and year are required" });
+      }
+      if (!cvv) {
+        return res.status(400).json({ error: "CVV is required" });
+      }
+    }
+
+    const result = await paymentService.createPayment({
+      cardNumber,
+      expiryMonth: expiryMonth ? parseInt(expiryMonth, 10) : undefined,
+      expiryYear: expiryYear ? parseInt(expiryYear, 10) : undefined,
+      cvv,
+      amount,
+      orderId,
+      userId,
+      currency,
+      metadata
+    });
+
+    const { payment, validation } = result;
+
+    if (validation) {
+      if (validation.overall.valid) {
+        return res.status(201).json({
+          success: true,
+          message: 'Payment created and validated',
+          payment,
+          validation
+        });
+      }
+
+      return res.status(400).json({
+        success: false,
+        message: 'Payment validation failed',
+        payment,
+        validation,
+        errors: validation.overall.errors
+      });
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: 'Payment created',
+      payment
+    });
+  } catch (error) {
+    console.error('Create payment error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
 async function getPaymentController(req, res) {
   try {
     const { id } = req.params;
@@ -229,6 +347,7 @@ async function cancelPaymentController(req, res) {
 
 module.exports = {
   validatePaymentController,
+  createPaymentController,
   getPaymentController,
   getPaymentsByOrderController,
   getPaymentsByUserController,

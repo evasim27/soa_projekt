@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const {
   validatePaymentController,
+  createPaymentController,
   getPaymentController,
   getPaymentsByOrderController,
   getPaymentsByUserController,
@@ -49,6 +50,58 @@ const {
  *           type: string
  */
 
+/**
+ * @swagger
+ * /payments:
+ *   post:
+ *     summary: Create a new payment
+ *     tags: [Payments]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - amount
+ *             properties:
+ *               amount:
+ *                 type: number
+ *               orderId:
+ *                 type: integer
+ *               userId:
+ *                 type: integer
+ *               currency:
+ *                 type: string
+ *               cardNumber:
+ *                 type: string
+ *               expiryMonth:
+ *                 type: integer
+ *               expiryYear:
+ *                 type: integer
+ *               cvv:
+ *                 type: string
+ *               metadata:
+ *                 type: object
+ *     responses:
+ *       201:
+ *         description: Payment created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Payment'
+ *       400:
+ *         description: Validation failed or missing fields
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *       500:
+ *         description: Internal server error
+ */
 /**
  * @swagger
  * /payments/validate:
@@ -124,6 +177,7 @@ const {
  */
 router.post("/validate", validatePaymentController);
 router.post("/refund", refundPaymentController);
+router.post("/", createPaymentController);
 
 /**
  * @swagger

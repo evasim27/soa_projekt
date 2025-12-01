@@ -48,12 +48,14 @@ Tehnologije
 Node.js (Express)
 PostgreSQL
 Port: 5003
+Dokumentacija: http://localhost:5003/api-docs
 
 ENDPOINTI
 | Metoda     | Pot                        | Opis                                      |
 | ---------- | ---------------------------| ----------------------------------------- |
 | **POST**   | `/payments/validate`       | Preveri podatke kartice (številka, datum, CVV) |
 | **POST**   | `/payments/refund`         | Procesira povračilo plačila               |
+| **POST**   | `/payments`                | Ustvari novo plačilo                       |
 | **GET**    | `/payments/{id}`           | Vrne plačilo po ID                        |
 | **GET**    | `/payments/order/{orderId}`| Vrne plačila za naročilo                  |
 | **GET**    | `/payments/user/{userId}`  | Vrne plačila uporabnika                   |
@@ -61,6 +63,18 @@ ENDPOINTI
 | **PUT**    | `/payments/{id}/capture`   | Capture avtoriziranega plačila            |
 | **DELETE** | `/payments/{id}`           | Izbriše plačilo                           |
 | **DELETE** | `/payments/{id}/cancel`    | Prekliče plačilo                          |
+
+Primer: ustvarjanje plačila brez podatkov o kartici
+
+```powershell
+curl -X POST http://localhost:5003/payments -H "Content-Type: application/json" -d '{"amount":9.99, "orderId": 123, "userId": 42, "currency": "EUR", "metadata": {"note": "Pickup"}}'
+```
+
+Primer: ustvarjanje plačila s podatki o kartici (validacija + ustvarjanje)
+
+```powershell
+curl -X POST http://localhost:5003/payments -H "Content-Type: application/json" -d '{"amount":9.99,"orderId":123,"userId":42,"currency":"EUR","cardNumber":"4242424242424242","expiryMonth":12,"expiryYear":2026,"cvv":"123"}'
+```
 
 **4) notification-service**
 Tehnologije

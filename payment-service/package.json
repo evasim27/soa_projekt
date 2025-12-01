@@ -4,7 +4,9 @@
   "description": "Payment validation service for Food Waste platform",
   "main": "index.js",
   "scripts": {
-    "dev": "nodemon src/app.js"
+    "dev": "nodemon src/app.js",
+    "start": "node src/app.js",
+    "docs:generate": "node scripts/generate-swagger.js"
   },
   "keywords": [],
   "author": "",
@@ -16,7 +18,8 @@
     "express": "^5.1.0",
     "pg": "^8.16.3",
     "swagger-jsdoc": "^6.2.8",
-    "swagger-ui-express": "^5.0.0"
+    "swagger-ui-express": "^5.0.0",
+    "js-yaml": "^4.1.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.11"

@@ -116,8 +116,53 @@ async function updatePaymentStatus(paymentId, status, metadata = {}) {
   return await PaymentModel.update(paymentId, updates);
 }
 
+async function createPayment(paymentData) {
+  const {
+    cardNumber,
+    expiryMonth,
+    expiryYear,
+    cvv,
+    amount,
+    orderId,
+    userId,
+    currency = 'EUR',
+    metadata = {}
+  } = paymentData;
+
+  if (cardNumber) {
+    const result = await validatePayment({
+      cardNumber,
+      expiryMonth,
+      expiryYear,
+      cvv,
+      amount,
+      orderId,
+      userId,
+      currency
+    });
+    return { payment: result.payment, validation: result.validation };
+  }
+
+  const paymentRecord = await PaymentModel.create({
+    order_id: orderId || null,
+    user_id: userId || null,
+    amount: amount || 0,
+    currency: currency,
+    status: 'created',
+    card_brand: null,
+    card_last_four: null,
+    expiry_month: null,
+    expiry_year: null,
+    validation_result: null,
+    metadata: Object.assign({}, metadata, { created_at: new Date().toISOString() })
+  });
+
+  return { payment: paymentRecord, validation: null };
+}
+
 module.exports = {
   validatePayment,
+  createPayment,
   getPaymentById,
   getPaymentsByOrderId,
   getPaymentsByUserId,
