@@ -13,10 +13,10 @@ def merchant_exists(merchant_id: int) -> bool:
     return exists
 
 
-def create_merchant(data, location_data):
+def create_merchant(data, location_data, user_id):
 
     # 1) preveri user obstoj
-    user = get_user(data.user_id)
+    user = get_user(user_id)
     if not user:
         return None, "User does not exist"
 
@@ -25,7 +25,7 @@ def create_merchant(data, location_data):
         return None, "User is already merchant"
 
     # 3) poskusi nadgraditi role
-    role_ok = upgrade_user_role(data.user_id)
+    role_ok = upgrade_user_role(user_id)
     if not role_ok:
         return None, "Failed to upgrade user role. Merchant not created."
 
@@ -41,7 +41,7 @@ def create_merchant(data, location_data):
             VALUES (%s, %s, %s)
             RETURNING id, user_id, business_name, description
             """,
-            (data.user_id, data.business_name, data.description)
+            (user_id, data.business_name, data.description)
         )
         merchant = cursor.fetchone()
 
@@ -71,55 +71,6 @@ def create_merchant(data, location_data):
         cursor.close()
         conn.close()
 
-
-    user = get_user(data.user_id)
-    if not user:
-        return None, "User does not exist"
-
-    if user.get("role") != "user":
-        return None, "User is already merchant"
-
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    try:
-        cursor.execute(
-            """
-            INSERT INTO merchants (user_id, business_name, description)
-            VALUES (%s, %s, %s)
-            RETURNING id, user_id, business_name, description
-            """,
-            (data.user_id, data.business_name, data.description)
-        )
-        merchant = cursor.fetchone()
-
-        cursor.execute(
-            """
-            INSERT INTO merchant_locations (merchant_id, address, city, postal_code)
-            VALUES (%s, %s, %s, %s)
-            RETURNING id, merchant_id, address, city, postal_code
-            """,
-            (merchant["id"], location_data.address, location_data.city, location_data.postal_code)
-        )
-
-        location = cursor.fetchone()
-
-        # upgrade user role
-        upgrade_user_role(data.user_id)
-
-        conn.commit()
-        return {
-            "merchant": merchant,
-            "location": location
-        }, None
-
-    except Exception as e:
-        conn.rollback()
-        return None, str(e)
-
-    finally:
-        cursor.close()
-        conn.close()
 
 
 def get_all_merchants():

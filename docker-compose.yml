@@ -62,6 +62,7 @@ services:
       DB_PASS: postgres
       DB_NAME: merchantdb
       USER_SERVICE_URL: http://user-service:5001
+      JWT_SECRET: microservices_soa_2025_26
     depends_on:
       - merchant-db
     networks:

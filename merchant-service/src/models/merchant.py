@@ -4,7 +4,7 @@ from src.models.merchant_location import MerchantLocation
 
 class MerchantBase(BaseModel):
     id: int
-    user_id: int
+    #user_id: int
     business_name: str
     description: str | None = None
 
