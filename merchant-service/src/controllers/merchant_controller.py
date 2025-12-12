@@ -8,8 +8,8 @@ from src.services.merchant_service import (
     delete_merchant
 )
 
-def create_merchant_controller(data, location_data):
-    result, error = create_merchant(data, location_data)
+def create_merchant_controller(data, location_data, user_id):
+    result, error = create_merchant(data, location_data, user_id)
 
     if error:
         raise HTTPException(status_code=400, detail=error)

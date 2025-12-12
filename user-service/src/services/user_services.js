@@ -1,5 +1,6 @@
 const UsersModel = require("../models/user_model.js");
 const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
 
 function success(data) {
   return { status: 200, data };
@@ -50,25 +51,36 @@ const UserService = {
         return error("Email and password are required", 400);
     }
 
-    // 1) preveri, če uporabnik obstaja
     const user = await UsersModel.findByEmail(email);
     if (!user) {
         return error("User not found", 404);
     }
 
-    // 2) preveri geslo
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
         return error("Invalid password", 401);
     }
 
-    // 3) uspeh
+    const payload = {
+      sub: String(user.id),
+      name: user.name,
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + 60 * 60
+    };
+
+    const token = jwt.sign(
+      payload,
+      process.env.JWT_SECRET,
+      { algorithm: "HS256" }
+    );
+
+
+
     return success({
-        message: "Login successful",
-        userId: user.id,
-        role: user.role
+      message: "Login successful",
+      token
     });
-    },
+  },
 
 
   getAll: async () => {
