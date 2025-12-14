@@ -2,11 +2,12 @@ const QRCode = require('qrcode');
 const path = require('path');
 const fs = require('fs');
 const { pool } = require('../db');
+const { authenticateJWT } = require('../middlewares/auth'); // ← DODAJ TO
 
 module.exports = async function (fastify, opts) {
     const qrDir = opts.qrDir || path.join(__dirname, '..', '..', 'qrcodes');
 
-    // GET 1: list orders
+    // GET 1: list orders (javni - brez JWT)
     fastify.get('/', {
         schema: {
             summary: 'List orders',
@@ -54,7 +55,7 @@ module.exports = async function (fastify, opts) {
         return rows;
     });
 
-    // GET 2: get order
+    // GET 2: get order (javni - brez JWT)
     fastify.get('/:id', {
         schema: {
             summary: 'Get an order by id',
@@ -90,6 +91,7 @@ module.exports = async function (fastify, opts) {
 
     // POST 1: create order + generate QR
     fastify.post('/', {
+        preHandler: authenticateJWT,
         schema: {
             summary: 'Create order and generate QR',
             body: {
@@ -136,7 +138,7 @@ module.exports = async function (fastify, opts) {
             const { rows } = await pool.query(insert, [offer_id, name, email, phone, quantity]);
             const order = rows[0];
             const qrData = JSON.stringify({ type: 'reservation', id: order.id });
-            const filename = `qr-${order.id}.png`;
+            const filename = `qr-${order.id}. png`;
             const filepath = path.join(qrDir, filename);
             try { fs.mkdirSync(qrDir, { recursive: true }); } catch (e) { }
             await QRCode.toFile(filepath, qrData, { width: 300 });
@@ -150,7 +152,8 @@ module.exports = async function (fastify, opts) {
     });
 
     // POST 2: confirm reservation
-    fastify.post('/:id/confirm', {
+    fastify.post('/: id/confirm', {
+        preHandler: authenticateJWT,
         schema: {
             summary: 'Confirm reservation',
             params: {
@@ -173,6 +176,7 @@ module.exports = async function (fastify, opts) {
 
     // PUT 1: update order
     fastify.put('/:id', {
+        preHandler: authenticateJWT,
         schema: {
             summary: 'Update order fields',
             params: {
@@ -220,7 +224,8 @@ module.exports = async function (fastify, opts) {
     });
 
     // PUT 2: change status only
-    fastify.put('/:id/status', {
+    fastify.put('/: id/status', {
+        preHandler: authenticateJWT,
         schema: {
             summary: 'Change order status',
             params: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
@@ -249,6 +254,7 @@ module.exports = async function (fastify, opts) {
 
     // DELETE 1: cancel order
     fastify.delete('/:id', {
+        preHandler: authenticateJWT,
         schema: {
             summary: 'Delete (cancel) order',
             params: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
@@ -267,7 +273,8 @@ module.exports = async function (fastify, opts) {
     });
 
     // DELETE 2: delete qr only
-    fastify.delete('/:id/qr', {
+    fastify.delete('/: id/qr', {
+        preHandler: authenticateJWT,
         schema: {
             summary: 'Delete QR of order',
             params: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
@@ -286,6 +293,7 @@ module.exports = async function (fastify, opts) {
         return { message: 'qr deleted' };
     });
 
+    // GET QR images — javni (brez JWT, da lahko prikažem QR)
     fastify.get('/qrcodes/:file', {
         schema: {
             summary: 'Serve QR image file',
