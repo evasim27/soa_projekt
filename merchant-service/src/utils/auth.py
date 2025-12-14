@@ -1,27 +1,33 @@
-from fastapi import Depends, HTTPException, Header, status
+from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
 import os
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=True)
 JWT_SECRET = os.getenv("JWT_SECRET")
 ALGORITHM = "HS256"
 
-def verify_token(authorization: str = Header(...)):
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing Bearer token")
+def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    # credentials.scheme bo "Bearer", credentials.credentials je JWT brez "Bearer "
+    if credentials.scheme.lower() != "bearer":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication scheme",
+        )
 
-    token = authorization.split(" ")[1]
+    token = credentials.credentials
 
     try:
         payload = jwt.decode(
             token,
             JWT_SECRET,
-            algorithms=["HS256"]
+            algorithms=[ALGORITHM],
         )
         print("DECODED PAYLOAD:", payload)
         return payload
     except JWTError as e:
         print("JWT ERROR:", str(e))
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-        
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+        )
