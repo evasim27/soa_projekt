@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const { authenticateJWT } = require("../middlewares/auth");
 const {
   validatePaymentController,
   createPaymentController,
@@ -175,9 +176,9 @@ const {
  *       404:
  *         description: Payment not found
  */
-router.post("/validate", validatePaymentController);
-router.post("/refund", refundPaymentController);
-router.post("/", createPaymentController);
+router.post("/validate", authenticateJWT, validatePaymentController);
+router.post("/refund", authenticateJWT, refundPaymentController);
+router.post("/", authenticateJWT, createPaymentController);
 
 /**
  * @swagger
@@ -276,7 +277,7 @@ router.get("/user/:userId", getPaymentsByUserController);
  *       404:
  *         description: Payment not found
  */
-router.put("/:id/status", updatePaymentController);
+router.put("/:id/status", authenticateJWT, updatePaymentController);
 
 /**
  * @swagger
@@ -296,7 +297,7 @@ router.put("/:id/status", updatePaymentController);
  *       404:
  *         description: Payment not found
  */
-router.put("/:id/capture", capturePaymentController);
+router.put("/:id/capture", authenticateJWT, capturePaymentController);
 
 /**
  * @swagger
@@ -316,7 +317,7 @@ router.put("/:id/capture", capturePaymentController);
  *       404:
  *         description: Payment not found
  */
-router.delete("/:id", deletePaymentController);
+router.delete("/:id", authenticateJWT, deletePaymentController);
 
 /**
  * @swagger
@@ -336,6 +337,6 @@ router.delete("/:id", deletePaymentController);
  *       404:
  *         description: Payment not found
  */
-router.delete("/:id/cancel", cancelPaymentController);
+router.delete("/:id/cancel", authenticateJWT, cancelPaymentController);
 
 module.exports = router;

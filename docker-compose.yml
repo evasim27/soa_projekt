@@ -97,6 +97,7 @@ services:
       DB_NAME: paymentdb
       PORT: 5003
       USER_SERVICE_URL: http://user-service:5001
+      JWT_SECRET: ${JWT_SECRET}
     depends_on:
       - payment-db
     networks:
@@ -131,6 +132,7 @@ services:
       DB_NAME: notificationdb
       PORT: 5004
       USER_SERVICE_URL: http://user-service:5001
+      JWT_SECRET: ${JWT_SECRET}
     depends_on:
       - notification-db
     networks:
