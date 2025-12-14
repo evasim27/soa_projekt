@@ -3,6 +3,7 @@ Tehnologije:
 Node.js (Express)
 PostgreSQL
 Port: 5001
+Dokumentacija: http://localhost:5001/docs
 
 ENDPOINTI
 
