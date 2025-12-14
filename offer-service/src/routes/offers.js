@@ -3,9 +3,10 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { pool } = require('../db');
+const { authenticateJWT } = require('../middlewares/auth'); // ← DODAJ TO
 
 const router = express.Router();
-const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '..', '..', 'uploads');
+const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '.. ', '..', 'uploads');
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, UPLOAD_DIR),
@@ -16,7 +17,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// GET 1: list offers
+// GET 1: list offers (javni - brez JWT)
 router.get('/', async (req, res) => {
     try {
         const { limit = 50, offset = 0, q } = req.query;
@@ -35,7 +36,7 @@ router.get('/', async (req, res) => {
     }
 });
 
-// GET 2: get by id
+// GET 2: get by id (javni - brez JWT)
 router.get('/:id', async (req, res) => {
     try {
         const { rows } = await pool.query('SELECT * FROM offers WHERE id=$1', [req.params.id]);
@@ -47,7 +48,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST 1: create offer
-router.post('/', async (req, res) => {
+router.post('/', authenticateJWT, async (req, res) => {
     try {
         const { title, description, quantity = 1, unit = 'pcs', price = 0, location } = req.body;
         if (!title) return res.status(400).json({ error: 'title required' });
@@ -62,7 +63,7 @@ router.post('/', async (req, res) => {
 });
 
 // POST 2: upload image
-router.post('/:id/image', upload.single('image'), async (req, res) => {
+router.post('/:id/image', authenticateJWT, upload.single('image'), async (req, res) => {
     try {
         const id = req.params.id;
         const file = req.file;
@@ -81,7 +82,7 @@ router.post('/:id/image', upload.single('image'), async (req, res) => {
 });
 
 // PUT 1: update offer
-router.put('/:id', async (req, res) => {
+router.put('/:id', authenticateJWT, async (req, res) => {
     try {
         const fields = ['title', 'description', 'quantity', 'unit', 'price', 'location'];
         const updates = [];
@@ -105,7 +106,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // PUT 2: adjust stock
-router.put('/:id/stock', async (req, res) => {
+router.put('/:id/stock', authenticateJWT, async (req, res) => {
     try {
         const { delta } = req.body;
         if (typeof delta !== 'number') return res.status(400).json({ error: 'delta number required' });
@@ -119,7 +120,7 @@ router.put('/:id/stock', async (req, res) => {
 });
 
 // DELETE 1: delete offer
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authenticateJWT, async (req, res) => {
     try {
         const { rows } = await pool.query('DELETE FROM offers WHERE id=$1 RETURNING *', [req.params.id]);
         if (!rows[0]) return res.status(404).json({ error: 'Not found' });
@@ -133,7 +134,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // DELETE 2: delete image only
-router.delete('/:id/image', async (req, res) => {
+router.delete('/:id/image', authenticateJWT, async (req, res) => {
     try {
         const { rows } = await pool.query('SELECT image FROM offers WHERE id=$1', [req.params.id]);
         if (!rows[0]) return res.status(404).json({ error: 'Not found' });

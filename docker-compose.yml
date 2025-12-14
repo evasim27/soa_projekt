@@ -168,6 +168,7 @@ services:
       DB_NAME: offerdb
       PORT: 5005
       UPLOAD_DIR: /usr/src/app/uploads
+      JWT_SECRET: microservices_soa_2025_26
     volumes:
       - ./offer-service/uploads:/usr/src/app/uploads
     networks:
@@ -205,6 +206,7 @@ services:
       DB_NAME: orderdb
       PORT: 5006
       QR_OUTPUT_DIR: /usr/src/app/qrcodes
+      JWT_SECRET: microservices_soa_2025_26
     volumes:
       - ./order-service/qrcodes:/usr/src/app/qrcodes
     networks:
