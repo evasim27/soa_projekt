@@ -10,6 +10,16 @@ app.use(cors());
 const userRoutes = require("./routes/user_routes.js");
 app.use("/users", userRoutes);
 
+//swagger
+const swaggerUi = require("swagger-ui-express");
+const YAML = require("yamljs");
+const path = require("path");
+
+const swaggerDocument = YAML.load(path.join(__dirname, "docs", "openapi.yaml"));
+app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+
+app.get("/health", (req, res) => res.status(200).send("OK"));
+
 // port
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
