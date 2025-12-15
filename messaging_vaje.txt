@@ -1,0 +1,2 @@
+Poglej če je v headerju že correlation id, če ni ustvari
+Log type: info/error/warn
