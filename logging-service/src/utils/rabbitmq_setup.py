@@ -2,6 +2,8 @@ import pika
 import os
 import json
 import time
+import re
+from datetime import datetime
 
 def get_rabbitmq_connection():
     rabbitmq_host = os.getenv('RABBITMQ_HOST', 'localhost')
@@ -68,8 +70,37 @@ def consume_all_logs():
             break
         
         try:
-            log_data = json.loads(body.decode('utf-8'))
-            logs.append(log_data)
+            log_message = body.decode('utf-8')
+            
+            # Parse string format: <timestamp> <LogType> <URL> Correlation: <CorrelationId> [<serviceName>] - <Message>
+            # Example: 2026-01-01 21:03:03,751 INFO http://localhost:5003/health Correlation: 3411af89 [payment-service] - Klic storitve GET /health
+            
+            pattern = r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) (\w+) (\S+) Correlation: (\S+) \[([^\]]+)\] - (.+)$'
+            match = re.match(pattern, log_message)
+            
+            if match:
+                timestamp_str, log_type, url, correlation_id, service_name, message = match.groups()
+                
+                # Convert timestamp to ISO format
+                timestamp = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S,%f').isoformat()
+                
+                log_data = {
+                    'timestamp': timestamp,
+                    'log_type': log_type,
+                    'url': url,
+                    'correlation_id': correlation_id,
+                    'service_name': service_name,
+                    'message': message
+                }
+                logs.append(log_data)
+            else:
+                # If format doesn't match, try JSON fallback (for backward compatibility)
+                try:
+                    log_data = json.loads(log_message)
+                    logs.append(log_data)
+                except:
+                    print(f"Unable to parse log message: {log_message}")
+                    
         except Exception as e:
             print(f"Error parsing log message: {e}")
     

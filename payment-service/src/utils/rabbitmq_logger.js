@@ -42,19 +42,17 @@ class RabbitMQLogger {
                 await this.connect();
             }
 
-            const logData = {
-                timestamp: new Date().toISOString(),
-                log_type: logType.toUpperCase(),
-                url: url,
-                correlation_id: correlationId,
-                service_name: this.serviceName,
-                message: message
-            };
+            // Format timestamp: 2020-12-15 16:26:04,797
+            const now = new Date();
+            const timestamp = now.toISOString().replace('T', ' ').replace('Z', '').substring(0, 23).replace('.', ',');
+            
+            // Format: <timestamp> <LogType> <URL> Correlation: <CorrelationId> [<serviceName>] - <Sporočilo>
+            const logMessage = `${timestamp} ${logType.toUpperCase()} ${url} Correlation: ${correlationId} [${this.serviceName}] - ${message}`;
 
             this.channel.publish(
                 'logs_exchange',
                 '',
-                Buffer.from(JSON.stringify(logData)),
+                Buffer.from(logMessage),
                 { persistent: true }
             );
 

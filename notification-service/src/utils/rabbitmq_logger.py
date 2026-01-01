@@ -51,19 +51,17 @@ class RabbitMQLogger:
                     print("Cannot send log - RabbitMQ connection failed")
                     return False
 
-            log_data = {
-                'timestamp': datetime.now().isoformat(),
-                'log_type': log_type.upper(),
-                'url': url,
-                'correlation_id': correlation_id,
-                'service_name': self.service_name,
-                'message': message
-            }
+            # Format timestamp: 2020-12-15 16:26:04,797
+            now = datetime.now()
+            timestamp = now.strftime('%Y-%m-%d %H:%M:%S,%f')[:-3]
+            
+            # Format: <timestamp> <LogType> <URL> Correlation: <CorrelationId> [<serviceName>] - <Sporočilo>
+            log_message = f"{timestamp} {log_type.upper()} {url} Correlation: {correlation_id} [{self.service_name}] - {message}"
 
             self.channel.basic_publish(
                 exchange='logs_exchange',
                 routing_key='',
-                body=json.dumps(log_data),
+                body=log_message,
                 properties=pika.BasicProperties(
                     delivery_mode=2,
                 )
