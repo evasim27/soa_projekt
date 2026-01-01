@@ -98,8 +98,26 @@ services:
       PORT: 5003
       USER_SERVICE_URL: http://user-service:5001
       JWT_SECRET: ${JWT_SECRET}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: admin
+      RABBITMQ_PASS: admin
     depends_on:
       - payment-db
+      - rabbitmq
+    networks:
+      - ToGoodToGoService
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    restart: always
+    ports:
+      - "5672:5672"   # AMQP port
+      - "15672:15672" # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
     networks:
       - ToGoodToGoService
 
@@ -133,8 +151,13 @@ services:
       PORT: 5004
       USER_SERVICE_URL: http://user-service:5001
       JWT_SECRET: ${JWT_SECRET}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: admin
+      RABBITMQ_PASS: admin
     depends_on:
       - notification-db
+      - rabbitmq
     networks:
       - ToGoodToGoService
 
@@ -214,6 +237,44 @@ services:
     networks:
       - ToGoodToGoService
 
+  logging-db:
+    image: postgres:15
+    container_name: logging-db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: loggingdb
+    volumes:
+      - logging_data:/var/lib/postgresql/data
+      - ./logging-service/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5439:5432"
+    networks:
+      - ToGoodToGoService
+
+  logging-service:
+    build: ./logging-service
+    container_name: logging-service
+    restart: always
+    ports:
+      - "5007:5007"
+    environment:
+      DB_HOST: logging-db
+      DB_USER: postgres
+      DB_PASS: postgres
+      DB_NAME: loggingdb
+      PORT: 5007
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: admin
+      RABBITMQ_PASS: admin
+    depends_on:
+      - logging-db
+      - rabbitmq
+    networks:
+      - ToGoodToGoService
+
 volumes:
   user_data:
   merchant_data:
@@ -221,6 +282,7 @@ volumes:
   notification_data:
   offer_data:
   order_data:
+  logging_data:
 
 networks:
   ToGoodToGoService:

@@ -5,13 +5,18 @@ const cors = require("cors");
 const path = require('path');
 const jsYaml = require('js-yaml');
 const paymentRoutes = require("./routes/payment_routes");
+const correlationIdMiddleware = require("./middlewares/correlation_id");
+const rabbitmqLogger = require("./utils/rabbitmq_logger");
 
 const app = express();
 const PORT = process.env.PORT || 5003;
 
 const { getSwaggerSpec } = require('./swagger');
 
-// Serve Swagger UI and have it load the spec from `/api-docs.json` so the frontend loads the freshest spec
+rabbitmqLogger.connect().catch(err => {
+  console.error('Failed to connect to RabbitMQ on startup:', err);
+});
+
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(null, { swaggerOptions: { url: '/api-docs.json' }}));
 
 app.get('/api-docs.json', (req, res) => {
@@ -40,6 +45,8 @@ app.get('/api-docs.yaml', (req, res) => {
 
 app.use(cors());
 app.use(express.json());
+
+app.use(correlationIdMiddleware);
 
 app.use("/payments", paymentRoutes);
 

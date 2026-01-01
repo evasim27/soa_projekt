@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query, Depends
+from fastapi import APIRouter, Query, Depends, Request
 from pydantic import BaseModel
 from typing import Optional
 from src.models.notification import NotificationCreate
@@ -31,62 +31,65 @@ from src.controllers.notification_controller import (
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
 @router.post("/new-offer")
-def create_new_offer_notification(notification: NotificationCreate, user=Depends(verify_token)):
-    return create_notification_controller(notification)
+def create_new_offer_notification(notification: NotificationCreate, request: Request, user=Depends(verify_token)):
+    return create_notification_controller(notification, request)
 
 @router.post("/reservation-confirmation")
-def create_reservation_confirmation(notification: NotificationCreate, user=Depends(verify_token)):
-    return create_notification_controller(notification)
+def create_reservation_confirmation(notification: NotificationCreate, request: Request, user=Depends(verify_token)):
+    return create_notification_controller(notification, request)
 
 @router.post("/expiration-reminder")
-def create_expiration_reminder(notification: NotificationCreate, user=Depends(verify_token)):
-    return create_notification_controller(notification)
+def create_expiration_reminder(notification: NotificationCreate, request: Request, user=Depends(verify_token)):
+    return create_notification_controller(notification, request)
 
 @router.post("/pickup-reminder")
-def create_pickup_reminder(notification: NotificationCreate, user=Depends(verify_token)):
-    return create_notification_controller(notification)
+def create_pickup_reminder(notification: NotificationCreate, request: Request, user=Depends(verify_token)):
+    return create_notification_controller(notification, request)
 
 @router.get("")
 def get_notifications(
+    request: Request,
     user_id: int = Query(..., description="User ID"),
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0)
 ):
-    return get_notifications_controller(user_id, limit, offset)
+    return get_notifications_controller(user_id, limit, offset, request)
 
 @router.get("/unread")
 def get_unread_notifications_count(
+    request: Request,
     user_id: int = Query(..., description="User ID")
 ):
-    return get_unread_count_controller(user_id)
+    return get_unread_count_controller(user_id, request)
 
 @router.get("/{notification_id}")
-def get_notification(notification_id: int):
-    return get_notification_controller(notification_id)
+def get_notification(notification_id: int, request: Request):
+    return get_notification_controller(notification_id, request)
 
 @router.put("/{notification_id}/read")
-def mark_notification_read(notification_id: int, user=Depends(verify_token)):
-    return mark_read_controller(notification_id)
+def mark_notification_read(notification_id: int, request: Request, user=Depends(verify_token)):
+    return mark_read_controller(notification_id, request)
 
 @router.put("/read-all")
 def mark_all_read(
+    request: Request,
     user_id: int = Query(..., description="User ID"),
     user=Depends(verify_token)
 ):
-    return mark_all_read_controller(user_id)
+    return mark_all_read_controller(user_id, request)
 
 @router.delete("/{notification_id}")
-def delete_notification(notification_id: int, user=Depends(verify_token)):
-    return delete_notification_controller(notification_id)
+def delete_notification(notification_id: int, request: Request, user=Depends(verify_token)):
+    return delete_notification_controller(notification_id, request)
 
 @router.get("/stats")
-def get_notification_stats(user_id: int = Query(..., description="User ID")):
-    return get_notification_stats_controller(user_id)
+def get_notification_stats(request: Request, user_id: int = Query(..., description="User ID")):
+    return get_notification_stats_controller(user_id, request)
 
 @router.delete("/bulk")
-def bulk_delete_notifications(params: BulkDeleteParams = Depends(), user=Depends(verify_token)):
-    return bulk_delete_notifications_controller(params.user_id, params.before_date)
+def bulk_delete_notifications(request: Request, params: BulkDeleteParams = Depends(), user=Depends(verify_token)):
+    return bulk_delete_notifications_controller(params.user_id, params.before_date, request)
 
 @router.delete("/read/{user_id}")
-def delete_read_notifications(user_id: int, user=Depends(verify_token)):
-    return delete_read_notifications_controller(user_id)
+def delete_read_notifications(user_id: int, request: Request, user=Depends(verify_token)):
+    return delete_read_notifications_controller(user_id, request)

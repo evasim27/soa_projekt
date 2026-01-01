@@ -1,0 +1,561 @@
+# Log Messaging System - Dokumentacija
+
+## Pregled sistema
+
+Ta dokument opisuje implementacijo vzorca Messaging za beleženje (logging) logov v mikroservisni arhitekturi. Sistem uporablja RabbitMQ kot sporočilni posrednik (message broker) za zbiranje, hrambo in pridobivanje logov iz mikroseritev.
+
+---
+
+## Arhitektura
+
+### Komponente sistema:
+
+1. **RabbitMQ** - Sporočilni posrednik za upravljanje z logi
+2. **logging-service** - Mikroservisica za upravljanje logov
+3. **notification-service** - Pošilja loge v RabbitMQ
+4. **payment-service** - Pošilja loge v RabbitMQ
+
+---
+
+## RabbitMQ Konfiguracija
+
+### Docker Compose nastavitve:
+```yaml
+rabbitmq:
+  image: rabbitmq:3-management
+  container_name: rabbitmq
+  ports:
+    - "5672:5672"   # AMQP protocol port
+    - "15672:15672" # Management UI port
+  environment:
+    RABBITMQ_DEFAULT_USER: admin
+    RABBITMQ_DEFAULT_PASS: admin
+```
+
+### Exchange in Queue:
+- **Exchange Name**: `logs_exchange`
+- **Exchange Type**: `fanout` (broadcast)
+- **Queue Name**: `logging_queue`
+- **Durable**: `true` (persistent)
+
+**Fanout Exchange** pomeni, da se vsako sporočilo, poslano na exchange, dostavi v vse povezane queue-je. To omogoča preprosto širjenje logov.
+
+---
+
+## Logging Service (Port 5007)
+
+### Namembnost:
+Logging service je centralna mikroservisica, ki:
+- Bere loge iz RabbitMQ queue-ja
+- Shranjuje loge v PostgreSQL bazo
+- Omogoča poizvedbe po logih (po datumu)
+- Omogoča brisanje vseh logov
+
+### Baza podatkov:
+**Tabela: logs**
+```sql
+- id (serial primary key)
+- timestamp (timestamp) - kdaj se je dogodek zgodil
+- log_type (varchar) - INFO/ERROR/WARN
+- url (varchar) - URL kjer se je dogodek zgodil
+- correlation_id (varchar) - ID za sledenje klicu
+- service_name (varchar) - ime mikroservisa
+- message (text) - opis dogodka
+- created_at (timestamp) - kdaj je bil log shranjen v bazo
+```
+
+### API Endpoints:
+
+#### 1. POST /logs
+**Opis**: Prenese vse loge iz RabbitMQ queue-ja in jih shrani v bazo.
+
+**Kako deluje**:
+1. Se poveže na RabbitMQ
+2. Prebere vse sporočila iz `logging_queue`
+3. Parsira vsako sporočilo (JSON format)
+4. Shrani loge v PostgreSQL bazo
+5. Vrne število shranjenih logov
+
+**Primer response**:
+```json
+{
+  "message": "Logs successfully fetched and saved",
+  "count": 42
+}
+```
+
+**Kdaj uporabiti**: Pokličeš ta endpoint, ko želiš prenesti loge iz queue-ja v bazo za trajno shranjevanje in analizo.
+
+#### 2. GET /logs/{datumOd}/{datumDo}
+**Opis**: Vrne vse loge med dvema datumoma.
+
+**Format datuma**: `YYYY-MM-DD` (npr. `2026-01-01`)
+
+**Primer klica**:
+```
+GET http://localhost:5007/logs/2026-01-01/2026-01-31
+```
+
+**Primer response**:
+```json
+{
+  "logs": [
+    {
+      "id": 1,
+      "timestamp": "2026-01-15T16:26:04.797Z",
+      "log_type": "INFO",
+      "url": "http://localhost:5004/notifications",
+      "correlation_id": "123e4567-e89b-12d3-a456-426614174000",
+      "service_name": "notification-service",
+      "message": "Klic storitve GET /notifications"
+    }
+  ],
+  "count": 1,
+  "date_from": "2026-01-01",
+  "date_to": "2026-01-31"
+}
+```
+
+#### 3. DELETE /logs
+**Opis**: Izbriše vse loge iz baze.
+
+**Primer response**:
+```json
+{
+  "message": "All logs deleted successfully",
+  "deleted_count": 156
+}
+```
+
+**Opomba**: To izbriše loge samo iz baze, ne iz RabbitMQ queue-ja.
+
+---
+
+## Implementacija v Notification Service (Python/FastAPI)
+
+### Koraki implementacije:
+
+#### 1. Dependency: pika
+```bash
+pip install pika
+```
+
+#### 2. RabbitMQ Logger Utility
+**Datoteka**: `src/utils/rabbitmq_logger.py`
+
+**Glavne funkcije**:
+- `connect()` - vzpostavi povezavo z RabbitMQ
+- `send_log(log_type, url, correlation_id, message)` - pošlje log v exchange
+- `log_info()`, `log_error()`, `log_warn()` - helper funkcije
+
+**Struktura log sporočila**:
+```python
+{
+    'timestamp': '2026-01-15T16:26:04.797000',
+    'log_type': 'INFO',
+    'url': 'http://localhost:5004/notifications',
+    'correlation_id': '123e4567-e89b-12d3-a456-426614174000',
+    'service_name': 'notification-service',
+    'message': 'Klic storitve GET /notifications'
+}
+```
+
+#### 3. Correlation ID Middleware
+**Datoteka**: `src/main.py`
+
+```python
+@app.middleware("http")
+async def correlation_id_middleware(request: Request, call_next):
+    # Preveri če obstaja correlation ID v header
+    correlation_id = request.headers.get('X-Correlation-ID')
+    
+    # Če ne obstaja, ustvari novega (UUID v4)
+    if not correlation_id:
+        correlation_id = str(uuid.uuid4())
+    
+    # Shrani v request state
+    request.state.correlation_id = correlation_id
+    
+    # Logira vsak klic
+    rabbitmq_logger.log_info(
+        url=f"http://{request.url.hostname}:{request.url.port}{request.url.path}",
+        correlation_id=correlation_id,
+        message=f"Klic storitve {request.method} {request.url.path}"
+    )
+    
+    response = await call_next(request)
+    
+    # Dodaj correlation ID v response header
+    response.headers['X-Correlation-ID'] = correlation_id
+    
+    return response
+```
+
+**Kaj dela middleware**:
+1. **Preveri header**: Pogleda če request vsebuje `X-Correlation-ID` header
+2. **Ustvari ID**: Če header ne obstaja, generira nov UUID
+3. **Shrani v request**: ID je dostopen v celotnem request lifeCycle-u
+4. **Logira klic**: Avtomatsko zalogira vsak API klic
+5. **Vrne v response**: Dodaj correlation ID nazaj v response headers
+
+#### 4. Logiranje v Controllerjih
+**Primer** (notification_controller.py):
+```python
+def create_notification_controller(notification: NotificationCreate, request: Request = None):
+    try:
+        result = create_notification(notification)
+        return result
+    except Exception as e:
+        if request:
+            correlation_id = getattr(request.state, 'correlation_id', 'N/A')
+            rabbitmq_logger.log_error(
+                url=str(request.url),
+                correlation_id=correlation_id,
+                message=f"Error creating notification: {str(e)}"
+            )
+        raise HTTPException(status_code=500, detail=str(e))
+```
+
+**Kdaj logiramo**:
+- **INFO**: Uspešni klici API endpointov
+- **ERROR**: Napake (exceptions)
+- **WARN**: Opozorila (npr. "Notification not found")
+
+---
+
+## Implementacija v Payment Service (Node.js/Express)
+
+### Koraki implementacije:
+
+#### 1. Dependencies: amqplib, uuid
+```bash
+npm install amqplib uuid
+```
+
+#### 2. RabbitMQ Logger Utility
+**Datoteka**: `src/utils/rabbitmq_logger.js`
+
+**Glavne funkcije**:
+- `connect()` - async funkcija za vzpostavitev povezave
+- `sendLog(logType, url, correlationId, message)` - pošlje log
+- `logInfo()`, `logError()`, `logWarn()` - helper funkcije
+
+**Struktura je enaka kot v Python verziji.**
+
+#### 3. Correlation ID Middleware
+**Datoteka**: `src/middlewares/correlation_id.js`
+
+```javascript
+const correlationIdMiddleware = async (req, res, next) => {
+    // Preveri če obstaja correlation ID v header
+    let correlationId = req.headers['x-correlation-id'];
+    
+    // Če ne obstaja, ustvari novega
+    if (!correlationId) {
+        correlationId = uuidv4();
+    }
+    
+    // Shrani v request objekt
+    req.correlationId = correlationId;
+    
+    // Dodaj v response header
+    res.setHeader('X-Correlation-ID', correlationId);
+    
+    // Logira klic
+    const url = `http://${req.get('host')}${req.originalUrl}`;
+    await rabbitmqLogger.logInfo(
+        url,
+        correlationId,
+        `Klic storitve ${req.method} ${req.path}`
+    );
+    
+    next();
+};
+```
+
+**Registracija middleware** (app.js):
+```javascript
+// Inicializacija RabbitMQ
+rabbitmqLogger.connect().catch(err => {
+    console.error('Failed to connect to RabbitMQ on startup:', err);
+});
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(correlationIdMiddleware); // Dodaj correlation ID middleware
+```
+
+#### 4. Logiranje v Controllerjih
+**Primer** (payment_controller.js):
+```javascript
+async function createPaymentController(req, res) {
+    try {
+        // ... validacija ...
+        
+        const result = await paymentService.createPayment({...});
+        
+        // SUCCESS log
+        await rabbitmqLogger.logInfo(
+            `http://${req.get('host')}${req.originalUrl}`,
+            req.correlationId,
+            `Payment created successfully: ID ${payment.id}, amount ${amount}`
+        );
+        
+        return res.status(201).json({...});
+    } catch (error) {
+        // ERROR log
+        await rabbitmqLogger.logError(
+            `http://${req.get('host')}${req.originalUrl}`,
+            req.correlationId,
+            `Create payment error: ${error.message}`
+        );
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+}
+```
+
+---
+
+## Correlation ID - Sledljivost
+
+### Namen:
+Correlation ID omogoča sledenje enemu "poslovnemu dogodku" (npr. kreiranje naročila) skozi več mikroseritev.
+
+### Kako deluje:
+
+1. **Prvi klic**: Client pokliče `POST /orders` (brez correlation ID)
+   - Order service ustvari nov correlation ID: `abc-123`
+   - Doda ga v header: `X-Correlation-ID: abc-123`
+   
+2. **Klic payment servisa**: Order service kliče `POST /payments`
+   - Prenese correlation ID v header: `X-Correlation-ID: abc-123`
+   - Payment service uporabi isti ID za logiranje
+   
+3. **Klic notification servisa**: Order service kliče `POST /notifications`
+   - Prenese isti correlation ID: `X-Correlation-ID: abc-123`
+   - Notification service uporabi isti ID za logiranje
+
+4. **Rezultat**: Vsi logi za ta dogodek imajo isti correlation ID
+   ```
+   INFO ... Correlation: abc-123 [order-service] - Creating order
+   INFO ... Correlation: abc-123 [payment-service] - Payment created
+   INFO ... Correlation: abc-123 [notification-service] - Notification sent
+   ```
+
+### Prednosti:
+- **Sledljivost**: Lahko najdeš vse loge za en request
+- **Debugging**: Enostavno identificiraš napake v workflow-u
+- **Monitoring**: Vidiš celoten lifecycle poslovnega dogodka
+
+---
+
+## Format Logov
+
+### Predpisana struktura:
+```
+<timestamp> <LogType> <URL> Correlation: <ID> [<serviceName>] - <sporočilo>
+```
+
+### Primer:
+```
+2026-01-15T16:26:04.797Z INFO http://localhost:5004/notifications Correlation: 123e4567-e89b-12d3-a456-426614174000 [notification-service] - Klic storitve GET /notifications
+```
+
+### Razlaga polj:
+- **timestamp**: ISO 8601 format (UTC)
+- **LogType**: INFO, ERROR, ali WARN
+- **URL**: Celoten URL kjer se je dogodek zgodil
+- **Correlation ID**: UUID za sledenje
+- **serviceName**: Ime mikroservisa (v oglatih oklepajih)
+- **sporočilo**: Opis dogodka
+
+---
+
+## Dobre prakse
+
+### 1. Vedno prenašaj Correlation ID
+Ko mikroservisica kliče drugo mikroservisico, vedno dodaj `X-Correlation-ID` header:
+
+**Python primer**:
+```python
+headers = {
+    'X-Correlation-ID': correlation_id,
+    'Authorization': f'Bearer {token}'
+}
+response = requests.get(url, headers=headers)
+```
+
+**Node.js primer**:
+```javascript
+const headers = {
+    'X-Correlation-ID': correlationId,
+    'Authorization': `Bearer ${token}`
+};
+const response = await axios.get(url, { headers });
+```
+
+### 2. Logiraj pomembne dogodke
+- **INFO**: API klici, uspešne operacije
+- **WARN**: Manjkajoči podatki, "not found" situacije
+- **ERROR**: Exceptions, kritične napake
+
+### 3. Vključi kontekst
+Vedno vključi pomembne informacije v log message:
+- User ID
+- Order ID
+- Payment ID
+- Amount
+- ...
+
+**Primer dobrega loga**:
+```
+Payment validation failed for order 42, user 5: Invalid card number, Expired card
+```
+
+**Primer slabega loga**:
+```
+Validation failed
+```
+
+### 4. Ne logiraj občutljivih podatkov
+**NIKOLI ne logiraj**:
+- Celotne številke kreditnih kartic
+- CVV kode
+- Gesla
+- Osebnih podatkov (razen ID-jev)
+
+### 5. Uporabi async/await
+Logging ne sme blokirati glavnega toka:
+```javascript
+// Dobro (async)
+await rabbitmqLogger.logInfo(...);
+
+// Slabo (sync - blokira)
+rabbitmqLogger.logInfoSync(...);
+```
+
+---
+
+## Workflow - Tipična uporaba
+
+### Scenario: Uporabnik naredi naročilo
+
+1. **Client kliče order-service**:
+   ```
+   POST /orders
+   ```
+   - Order service ustvari correlation ID
+   - Logira: "Creating order for user 5"
+
+2. **Order service kliče payment-service**:
+   ```
+   POST /payments (z X-Correlation-ID header)
+   ```
+   - Payment service uporabi isti correlation ID
+   - Logira: "Payment created successfully: ID 123"
+
+3. **Order service kliče notification-service**:
+   ```
+   POST /notifications (z X-Correlation-ID header)
+   ```
+   - Notification service uporabi isti correlation ID
+   - Logira: "Notification sent to user 5"
+
+4. **Vsi logi so v RabbitMQ queue-ju**
+
+5. **Admin kliče logging-service**:
+   ```
+   POST /logs
+   ```
+   - Logging service prebere vse loge iz queue-ja
+   - Shrani jih v bazo
+
+6. **Admin išče loge**:
+   ```
+   GET /logs/2026-01-01/2026-01-31
+   ```
+   - Dobi vse loge med datumoma
+   - Lahko filtrira po correlation ID
+
+---
+
+## Testiranje
+
+### 1. Test RabbitMQ Management UI
+```
+http://localhost:15672
+Username: admin
+Password: admin
+```
+- Preveri ali je `logs_exchange` ustvarjen
+- Preveri ali je `logging_queue` ustvarjen
+- Preveri število sporočil v queue-ju
+
+### 2. Test Logging
+```bash
+# Kliči notification service
+curl -X GET http://localhost:5004/notifications?user_id=1
+
+# Preveri queue v RabbitMQ UI - mora biti 1 sporočilo
+
+# Prenesi loge
+curl -X POST http://localhost:5007/logs
+
+# Pridobi loge
+curl -X GET http://localhost:5007/logs/2026-01-01/2026-12-31
+```
+
+### 3. Test Correlation ID
+```bash
+# Prvi klic z correlation ID
+curl -X POST http://localhost:5004/notifications/new-offer \
+  -H "Content-Type: application/json" \
+  -H "X-Correlation-ID: test-123" \
+  -H "Authorization: Bearer <token>" \
+  -d '{"user_id": 1, "title": "Test", "message": "Test"}'
+
+# Preveri loge - mora imeti correlation ID "test-123"
+curl -X POST http://localhost:5007/logs
+curl -X GET http://localhost:5007/logs/2026-01-01/2026-12-31
+```
+
+---
+
+## Troubleshooting
+
+### Problem: Logi se ne pojavljajo v RabbitMQ
+**Rešitev**:
+1. Preveri če je RabbitMQ aktiven: `docker ps`
+2. Preveri environment variables (RABBITMQ_HOST, RABBITMQ_PORT, ...)
+3. Preveri connectione v logger utility
+4. Preveri RabbitMQ management UI
+
+### Problem: Correlation ID je vedno nov
+**Rešitev**:
+1. Preveri header name: mora biti `X-Correlation-ID` (case-insensitive)
+2. Preveri ali middleware pravilno prenese header
+3. Preveri ali ga dodajaš pri kliciu drugih servisov
+
+### Problem: Logging service ne prebere logov
+**Rešitev**:
+1. Preveri ali je queue_name pravilen: `logging_queue`
+2. Preveri ali je exchange binding pravilno nastavljen
+3. Preveri permissions v RabbitMQ (admin user)
+
+---
+
+## Zaključek
+
+Ta sistem omogoča:
+✅ Centralizirano zbiranje logov iz mikroseritev
+✅ Sledljivost dogodkom preko correlation ID
+✅ Persistentno shranjevanje logov v bazo
+✅ Poizvedbe po logih (po datumu)
+✅ Ločevanje produkcije logov od njihove obdelave (asinhronost)
+
+**Ključne prednosti vzorca Messaging za logging**:
+- **Asinhronost**: Mikroservisi ne čakajo, da se log zapiše v bazo
+- **Zanesljivost**: RabbitMQ zagotavlja delivery sporočil
+- **Skalabilnost**: Lahko dodaš več consumer-jev za logging service
+- **Centralizacija**: Vsi logi na enem mestu

@@ -1,4 +1,5 @@
 const paymentService = require("../services/payment_service");
+const rabbitmqLogger = require("../utils/rabbitmq_logger");
 
 async function validatePaymentController(req, res) {
   try {
@@ -14,14 +15,29 @@ async function validatePaymentController(req, res) {
     } = req.body;
 
     if (!cardNumber) {
+      await rabbitmqLogger.logWarn(
+        `http://${req.get('host')}${req.originalUrl}`,
+        req.correlationId,
+        "Card number is missing in payment validation request"
+      );
       return res.status(400).json({ error: "Card number is required" });
     }
 
     if (!expiryMonth || !expiryYear) {
+      await rabbitmqLogger.logWarn(
+        `http://${req.get('host')}${req.originalUrl}`,
+        req.correlationId,
+        "Expiry month or year is missing in payment validation request"
+      );
       return res.status(400).json({ error: "Expiry month and year are required" });
     }
 
     if (!cvv) {
+      await rabbitmqLogger.logWarn(
+        `http://${req.get('host')}${req.originalUrl}`,
+        req.correlationId,
+        "CVV is missing in payment validation request"
+      );
       return res.status(400).json({ error: "CVV is required" });
     }
 
@@ -37,6 +53,11 @@ async function validatePaymentController(req, res) {
     });
 
     if (result.validation.overall.valid) {
+      await rabbitmqLogger.logInfo(
+        `http://${req.get('host')}${req.originalUrl}`,
+        req.correlationId,
+        `Payment validation successful for order ${orderId}, user ${userId}`
+      );
       return res.status(200).json({
         success: true,
         message: "Payment validation successful",
@@ -44,6 +65,11 @@ async function validatePaymentController(req, res) {
         validation: result.validation
       });
     } else {
+      await rabbitmqLogger.logWarn(
+        `http://${req.get('host')}${req.originalUrl}`,
+        req.correlationId,
+        `Payment validation failed for order ${orderId}: ${result.validation.overall.errors.join(', ')}`
+      );
       return res.status(400).json({
         success: false,
         message: "Payment validation failed",
@@ -54,6 +80,11 @@ async function validatePaymentController(req, res) {
     }
   } catch (error) {
     console.error("Payment validation error:", error);
+    await rabbitmqLogger.logError(
+      `http://${req.get('host')}${req.originalUrl}`,
+      req.correlationId,
+      `Payment validation error: ${error.message}`
+    );
     return res.status(500).json({ error: "Internal server error" });
   }
 }
@@ -120,14 +151,29 @@ async function createPaymentController(req, res) {
     } = req.body;
 
     if (!amount) {
+      await rabbitmqLogger.logWarn(
+        `http://${req.get('host')}${req.originalUrl}`,
+        req.correlationId,
+        "Amount is missing in create payment request"
+      );
       return res.status(400).json({ error: "Amount is required" });
     }
 
     if (cardNumber) {
       if (!expiryMonth || !expiryYear) {
+        await rabbitmqLogger.logWarn(
+          `http://${req.get('host')}${req.originalUrl}`,
+          req.correlationId,
+          "Expiry month or year is missing in create payment request"
+        );
         return res.status(400).json({ error: "Expiry month and year are required" });
       }
       if (!cvv) {
+        await rabbitmqLogger.logWarn(
+          `http://${req.get('host')}${req.originalUrl}`,
+          req.correlationId,
+          "CVV is missing in create payment request"
+        );
         return res.status(400).json({ error: "CVV is required" });
       }
     }
@@ -148,6 +194,11 @@ async function createPaymentController(req, res) {
 
     if (validation) {
       if (validation.overall.valid) {
+        await rabbitmqLogger.logInfo(
+          `http://${req.get('host')}${req.originalUrl}`,
+          req.correlationId,
+          `Payment created successfully: ID ${payment.id}, amount ${amount}`
+        );
         return res.status(201).json({
           success: true,
           message: 'Payment created and validated',
@@ -156,6 +207,11 @@ async function createPaymentController(req, res) {
         });
       }
 
+      await rabbitmqLogger.logWarn(
+        `http://${req.get('host')}${req.originalUrl}`,
+        req.correlationId,
+        `Payment created but validation failed: ${validation.overall.errors.join(', ')}`
+      );
       return res.status(400).json({
         success: false,
         message: 'Payment validation failed',
@@ -165,6 +221,11 @@ async function createPaymentController(req, res) {
       });
     }
 
+    await rabbitmqLogger.logInfo(
+      `http://${req.get('host')}${req.originalUrl}`,
+      req.correlationId,
+      `Payment created successfully: ID ${payment.id}, amount ${amount}`
+    );
     return res.status(201).json({
       success: true,
       message: 'Payment created',
@@ -172,6 +233,11 @@ async function createPaymentController(req, res) {
     });
   } catch (error) {
     console.error('Create payment error:', error);
+    await rabbitmqLogger.logError(
+      `http://${req.get('host')}${req.originalUrl}`,
+      req.correlationId,
+      `Create payment error: ${error.message}`
+    );
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -182,12 +248,22 @@ async function getPaymentController(req, res) {
     const payment = await paymentService.getPaymentById(parseInt(id, 10));
 
     if (!payment) {
+      await rabbitmqLogger.logWarn(
+        `http://${req.get('host')}${req.originalUrl}`,
+        req.correlationId,
+        `Payment not found: ID ${id}`
+      );
       return res.status(404).json({ error: "Payment not found" });
     }
 
     return res.status(200).json(payment);
   } catch (error) {
     console.error("Get payment error:", error);
+    await rabbitmqLogger.logError(
+      `http://${req.get('host')}${req.originalUrl}`,
+      req.correlationId,
+      `Get payment error: ${error.message}`
+    );
     return res.status(500).json({ error: "Internal server error" });
   }
 }
@@ -199,6 +275,11 @@ async function getPaymentsByOrderController(req, res) {
     return res.status(200).json(payments);
   } catch (error) {
     console.error("Get payments by order error:", error);
+    await rabbitmqLogger.logError(
+      `http://${req.get('host')}${req.originalUrl}`,
+      req.correlationId,
+      `Get payments by order error: ${error.message}`
+    );
     return res.status(500).json({ error: "Internal server error" });
   }
 }
@@ -218,6 +299,11 @@ async function getPaymentsByUserController(req, res) {
     return res.status(200).json(payments);
   } catch (error) {
     console.error("Get payments by user error:", error);
+    await rabbitmqLogger.logError(
+      `http://${req.get('host')}${req.originalUrl}`,
+      req.correlationId,
+      `Get payments by user error: ${error.message}`
+    );
     return res.status(500).json({ error: "Internal server error" });
   }
 }
@@ -227,6 +313,11 @@ async function refundPaymentController(req, res) {
     const { paymentId, amount, reason } = req.body;
 
     if (!paymentId) {
+      await rabbitmqLogger.logWarn(
+        `http://${req.get('host')}${req.originalUrl}`,
+        req.correlationId,
+        "Payment ID is missing in refund request"
+      );
       return res.status(400).json({ error: "Payment ID is required" });
     }
 
@@ -237,9 +328,19 @@ async function refundPaymentController(req, res) {
     });
 
     if (!updatedPayment) {
+      await rabbitmqLogger.logWarn(
+        `http://${req.get('host')}${req.originalUrl}`,
+        req.correlationId,
+        `Payment not found for refund: ID ${paymentId}`
+      );
       return res.status(404).json({ error: "Payment not found" });
     }
 
+    await rabbitmqLogger.logInfo(
+      `http://${req.get('host')}${req.originalUrl}`,
+      req.correlationId,
+      `Payment refunded successfully: ID ${paymentId}, amount ${amount}`
+    );
     return res.status(200).json({
       success: true,
       message: "Payment refunded successfully",
@@ -247,6 +348,11 @@ async function refundPaymentController(req, res) {
     });
   } catch (error) {
     console.error("Refund payment error:", error);
+    await rabbitmqLogger.logError(
+      `http://${req.get('host')}${req.originalUrl}`,
+      req.correlationId,
+      `Refund payment error: ${error.message}`
+    );
     return res.status(500).json({ error: "Internal server error" });
   }
 }
@@ -257,15 +363,30 @@ async function updatePaymentController(req, res) {
     const { status, metadata } = req.body;
 
     if (!status) {
+      await rabbitmqLogger.logWarn(
+        `http://${req.get('host')}${req.originalUrl}`,
+        req.correlationId,
+        "Status is missing in update payment request"
+      );
       return res.status(400).json({ error: "Status is required" });
     }
 
     const updatedPayment = await paymentService.updatePaymentStatus(parseInt(id, 10), status, metadata);
 
     if (!updatedPayment) {
+      await rabbitmqLogger.logWarn(
+        `http://${req.get('host')}${req.originalUrl}`,
+        req.correlationId,
+        `Payment not found for update: ID ${id}`
+      );
       return res.status(404).json({ error: "Payment not found" });
     }
 
+    await rabbitmqLogger.logInfo(
+      `http://${req.get('host')}${req.originalUrl}`,
+      req.correlationId,
+      `Payment updated successfully: ID ${id}, new status ${status}`
+    );
     return res.status(200).json({
       success: true,
       message: "Payment updated successfully",
@@ -273,6 +394,11 @@ async function updatePaymentController(req, res) {
     });
   } catch (error) {
     console.error("Update payment error:", error);
+    await rabbitmqLogger.logError(
+      `http://${req.get('host')}${req.originalUrl}`,
+      req.correlationId,
+      `Update payment error: ${error.message}`
+    );
     return res.status(500).json({ error: "Internal server error" });
   }
 }
