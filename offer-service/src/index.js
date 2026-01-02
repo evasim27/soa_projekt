@@ -9,6 +9,8 @@ const swaggerUi = require('swagger-ui-express');
 const { ensureSchema } = require('./db');
 const offersRouter = require('./routes/offers');
 
+const { initRabbitMQ, correlationMiddleware, loggingMiddleware } = require('./utils/logger');
+
 const PORT = process.env.PORT || 5005;
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads');
 
@@ -18,6 +20,8 @@ if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
     try {
         await ensureSchema();
         console.log('Offer DB schema ensured');
+
+        await initRabbitMQ();
     } catch (err) {
         console.error('Error ensuring schema', err);
         process.exit(1);
@@ -27,6 +31,10 @@ if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
     app.use(cors());
     app.use(morgan('tiny'));
     app.use(express.json());
+
+    app.use(correlationMiddleware);
+    app.use(loggingMiddleware);
+
     app.use('/uploads', express.static(UPLOAD_DIR));
 
     app.use('/offers', offersRouter);

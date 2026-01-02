@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const { pool } = require('../db');
 const { authenticateJWT } = require('../middlewares/auth'); // ← DODAJ TO
+const { sendLog } = require('../utils/logger');
 
 const router = express.Router();
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '.. ', '..', 'uploads');
@@ -56,8 +57,14 @@ router.post('/', authenticateJWT, async (req, res) => {
                  VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`;
         const params = [title, description, quantity, unit, price, location];
         const { rows } = await pool.query(sql, params);
+
+        sendLog('INFO', `http://localhost:5005${req.path}`, req.correlationId,
+            `Offer created: ${title} (ID: ${rows[0].id})`);
+
         res.status(201).json(rows[0]);
     } catch (err) {
+        sendLog('ERROR', `http://localhost:5005${req.path}`, req.correlationId,
+            `Failed to create offer: ${err.message}`);
         res.status(400).json({ error: err.message });
     }
 });
