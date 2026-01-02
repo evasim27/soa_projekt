@@ -11,12 +11,14 @@
         "@fastify/cors": "^9.0.0",
         "@fastify/swagger": "^8.0.0",
         "@fastify/swagger-ui": "^2.0.0",
+        "amqplib": "^0.10.9",
         "dotenv": "^16.3.1",
         "fastify": "^4.22.2",
         "jsonwebtoken": "^9.0.3",
         "pg": "^8.11.0",
         "pino-pretty": "^9.1.1",
-        "qrcode": "^1.5.1"
+        "qrcode": "^1.5.1",
+        "uuid": "^9.0.1"
     },
     "devDependencies": {
         "nodemon": "^2.0.22"

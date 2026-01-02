@@ -6,6 +6,8 @@ const fastifyCors = require('@fastify/cors');
 const { ensureSchema } = require('./db');
 const ordersRoutes = require('./routes/orders');
 
+const { initRabbitMQ, correlationHook, loggingHook } = require('./utils/logger');
+
 const PORT = process.env.PORT || 5006;
 const QR_DIR = process.env.QR_OUTPUT_DIR || path.join(__dirname, '..', 'qrcodes');
 
@@ -15,12 +17,18 @@ if (!fs.existsSync(QR_DIR)) fs.mkdirSync(QR_DIR, { recursive: true });
     try {
         await ensureSchema();
         fastify.log.info('Order DB schema ensured');
+
+        await initRabbitMQ();
     } catch (err) {
         fastify.log.error('Error ensuring schema', err);
         process.exit(1);
     }
 
     fastify.register(fastifyCors, { origin: '*' });
+
+    fastify.addHook('onRequest', correlationHook);
+
+    fastify.addHook('onRequest', loggingHook);
 
     fastify.register(require('@fastify/swagger'), {
         routePrefix: '/documentation',
